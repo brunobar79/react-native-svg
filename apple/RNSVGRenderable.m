@@ -374,6 +374,7 @@ UInt32 saturate(CGFloat value) {
     if (_vectorEffect == kRNSVGVectorEffectNonScalingStroke) {
         path = CGPathCreateCopyByTransformingPath(path, &svgToClientTransform);
         CGContextConcatCTM(context, CGAffineTransformInvert(svgToClientTransform));
+        CFAutorelease(path);
     }
 
     CGAffineTransform vbmatrix = self.svgView.getViewBoxTransform;

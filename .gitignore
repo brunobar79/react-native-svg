@@ -46,8 +46,5 @@ cn-doc.md
 #
 experimental/
 
-/lib/
-/flow-typed/
-
 # VS Code
 .vscode/
