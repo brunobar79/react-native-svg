@@ -65,7 +65,7 @@ export interface AST {
   styles?: string;
   priority?: Map<string, boolean | undefined>;
   parent: AST | null;
-  children: (AST | string)[] | (JSX.Element | string)[];
+  children: (AST | string)[] | (JSX.Element | string | null)[];
   props: {
     [prop: string]: Styles | string | undefined;
   };
@@ -78,12 +78,12 @@ export interface XmlAST extends AST {
 }
 
 export interface JsxAST extends AST {
-  children: (JSX.Element | string)[];
+  children: (JSX.Element | string | null)[];
 }
 
 export type AdditionalProps = {
   onError?: (error: Error) => void;
-  override?: Object;
+  override?: AdditionalProps;
 };
 
 export type UriProps = { uri: string | null } & AdditionalProps;
@@ -109,13 +109,21 @@ export function SvgAst({ ast, override }: AstProps) {
 export const err = console.error.bind(console);
 
 export function SvgXml(props: XmlProps) {
-  const { onError = err, xml, override } = props;
-  const ast = useMemo<JsxAST | null>(() => (xml !== null ? parse(xml) : null), [
-    xml,
-  ]);
+  const { xml } = props;
+  const onError = props.onError || props.override?.onError || err;
+  const ast = useMemo<JsxAST | null>(() => {
+    try {
+      return xml !== null ? parse(xml) : null;
+    } catch (e) {
+      if (onError) {
+        onError(e);
+      }
+      return null;
+    }
+  }, [xml, onError]);
 
   try {
-    return <SvgAst ast={ast} override={override || props} />;
+    return <SvgAst ast={ast} override={props.override || props} />;
   } catch (error) {
     onError(error);
     return null;
@@ -155,9 +163,13 @@ export class SvgFromXml extends Component<XmlProps, XmlState> {
   }
   parse(xml: string | null) {
     try {
-      this.setState({ ast: xml ? parse(xml) : null });
+      const ast = xml ? parse(xml) : null;
+      this.setState({ ast });
     } catch (e) {
-      console.error(e);
+      const onError = this.props.onError || this.props.override?.onError || err;
+      if (onError) {
+        onError(e);
+      }
     }
   }
   render() {
@@ -222,7 +234,7 @@ export function getStyle(string: string): Styles {
 export function astToReact(
   value: AST | string,
   index: number,
-): JSX.Element | string {
+): JSX.Element | string | null {
   if (typeof value === 'object') {
     const { Tag, props, children } = value;
     return (
@@ -231,7 +243,7 @@ export function astToReact(
       </Tag>
     );
   }
-  return value;
+  return null;
 }
 
 // slimmed down parser based on https://github.com/Rich-Harris/svg-parser
@@ -546,7 +558,7 @@ export function parse(source: string, middleware?: Middleware): JsxAST | null {
 
   if (root) {
     const xml: XmlAST = (middleware ? middleware(root) : root) || root;
-    const ast: (JSX.Element | string)[] = xml.children.map(astToReact);
+    const ast: (JSX.Element | string | null)[] = xml.children.map(astToReact);
     const jsx: JsxAST = xml as JsxAST;
     jsx.children = ast;
     return jsx;
